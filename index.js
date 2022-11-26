@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 const port = 5000;
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
 
 app.use(cors());
@@ -20,7 +20,7 @@ async function run() {
     try {
         const phoneCategoriCollection = client.db("sellphone").collection("phoneCategori");
         const userCollection = client.db("sellphone").collection("user");
-
+        const phonesCollection = client.db("sellphone").collection("phones");
         app.get('/phoneCategori', async (req, res) => {
             const phoneCate = await phoneCategoriCollection.find({}).toArray();
             res.send(phoneCate)
@@ -33,6 +33,21 @@ async function run() {
             const findServiceById = newservice.find(getService => getService._id == req.params.id)
             res.send(findServiceById);
         })
+        // get phones by brand
+        app.get('/phones/:brand', async (req, res) => {
+            const query = {};
+            const service = phoneCategoriCollection.find(query);
+            const newphone = await service.toArray();
+            const phones = newphone.find(getphone => getphone.brand == req.params.brand)
+            res.send(phones);
+        })
+
+        // post phones
+        app.post('/phones',async(req,res)=>{
+            const phone = req.body;
+            const phones = await phonesCollection.insertOne(phone);
+            res.send(phones);
+        })
 
         app.post('/users', async (req, res) => {
             const user = req.body;
@@ -40,10 +55,25 @@ async function run() {
             res.send(result);
         })
 
-        app.get('/users',async(req,res)=>{
+        app.get('/users', async (req, res) => {
             const users = await userCollection.find({}).toArray();
             res.send(users);
         })
+
+        // make seller role
+        app.put('/user/seller/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) }
+            const option = { upsert: true };
+            const updateDoc = {
+                $set: {
+                    role: 'isSeller',
+                }
+            }
+            const result = await userCollection.updateOne(filter, updateDoc, option);
+            res.send(result)
+        })
+
 
     } finally {
 
