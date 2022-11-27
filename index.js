@@ -31,6 +31,7 @@ async function run() {
             res.send(wistlist);
         })
 
+        // get buyer by email
         app.get('/wistlist', async (req, res) => {
             let query = {};
             if (req.query.buyer_email) {
@@ -41,6 +42,15 @@ async function run() {
             const cursor = wistlistCollection.find(query);
             const phones = await cursor.toArray();
             res.send(phones)
+        })
+
+        // get buyer product for seller
+        app.get('/order/:seller_email', async (req, res) => {
+            const query = {};
+            const service = wistlistCollection.find(query);
+            const newphone = await service.toArray();
+            const wistlist = newphone.filter(getphone => getphone.seller_email === req.params.seller_email)
+            res.send(wistlist);
         })
 
         app.get('/phoneCategori', async (req, res) => {
