@@ -22,6 +22,14 @@ async function run() {
         const userCollection = client.db("sellphone").collection("user");
         const phonesCollection = client.db("sellphone").collection("phones");
         const brandCollection = client.db("sellphone").collection("brand");
+        const wistlistCollection = client.db("sellphone").collection("wistlist");
+
+
+        app.post('/wistlist',async(req, res)=>{
+            const wist = req.body;
+            const wistlist = wistlistCollection.insertOne(wist);
+            res.send(wistlist);
+        })
 
         app.get('/phoneCategori', async (req, res) => {
             const phoneCate = await phoneCategoriCollection.find({}).toArray();
@@ -48,16 +56,6 @@ async function run() {
             const phones = await cursor.toArray();
             res.send(phones)
         })
-
-        // // get phones by user email
-        // app.get('/phones/:email', async (req, res) => {
-        //     const query = {};
-        //     const service = phonesCollection.find(query);
-        //     const newservice = await service.toArray();
-        //     const findServiceById = newservice.filter(getService => getService.email === req.params.email)
-        //     res.send(findServiceById);
-        // })
-
 
         // get phones by brand
         app.get('/phones/:brand', async (req, res) => {
@@ -92,6 +90,19 @@ async function run() {
             res.send(users);
         })
 
+        // get blue tick for buyer
+        app.get('/GetAprroveBuyer', async (req, res) => {
+            let query = {};
+            if (req.query.email) {
+                query = {
+                    email: req.query.email
+                }
+            }
+            const cursor = userCollection.find(query);
+            const buyer = await cursor.toArray();
+            res.send(buyer)
+        })
+
         // make seller role
         app.put('/user/seller/:id', async (req, res) => {
             const id = req.params.id;
@@ -103,9 +114,17 @@ async function run() {
                 }
             }
             const result = await userCollection.updateOne(filter, updateDoc, option);
-            res.send(result)
+            // const phone = await phonesCollection.updateOne(filter, updateDoc, option);
+            res.send({ result })
         })
 
+        // check is seller
+        app.get('/user/seller/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email };
+            const user = await userCollection.findOne(query);
+            res.send({ IsSeller: user.role == 'isSeller' });
+        })
 
     } finally {
 
