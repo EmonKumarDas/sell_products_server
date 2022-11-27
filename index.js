@@ -31,6 +31,13 @@ async function run() {
             res.send(wistlist);
         })
 
+        // get all seller
+        app.get('/seller', async(req,res)=>{
+           const seller = await userCollection.find({}).toArray();
+           res.send(seller);
+        })
+       
+
         // get buyer by email
         app.get('/wistlist', async (req, res) => {
             let query = {};
