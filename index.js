@@ -25,10 +25,22 @@ async function run() {
         const wistlistCollection = client.db("sellphone").collection("wistlist");
 
 
-        app.post('/wistlist',async(req, res)=>{
+        app.post('/wistlist', async (req, res) => {
             const wist = req.body;
             const wistlist = wistlistCollection.insertOne(wist);
             res.send(wistlist);
+        })
+
+        app.get('/wistlist', async (req, res) => {
+            let query = {};
+            if (req.query.buyer_email) {
+                query = {
+                    buyer_email: req.query.buyer_email
+                }
+            }
+            const cursor = wistlistCollection.find(query);
+            const phones = await cursor.toArray();
+            res.send(phones)
         })
 
         app.get('/phoneCategori', async (req, res) => {
@@ -114,7 +126,6 @@ async function run() {
                 }
             }
             const result = await userCollection.updateOne(filter, updateDoc, option);
-            // const phone = await phonesCollection.updateOne(filter, updateDoc, option);
             res.send({ result })
         })
 
