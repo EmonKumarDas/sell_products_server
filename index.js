@@ -153,6 +153,28 @@ async function run() {
             const user = await userCollection.findOne(query);
             res.send({ IsSeller: user.role == 'isSeller' });
         })
+        
+        // make Admin role
+        app.put('/user/admin/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) }
+            const option = { upsert: true };
+            const updateDoc = {
+                $set: {
+                    role: 'isAdmin',
+                }
+            }
+            const result = await userCollection.updateOne(filter, updateDoc, option);
+            res.send({ result })
+        })
+
+        // check is Admin
+        app.get('/user/admin/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email };
+            const user = await userCollection.findOne(query);
+            res.send({ IsAdmin: user.role == 'isAdmin' });
+        })
 
     } finally {
 
