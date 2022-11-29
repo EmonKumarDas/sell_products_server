@@ -4,6 +4,8 @@ const cors = require('cors');
 const port = 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
+const jwt = require('jsonwebtoken');
+const stripe = require("stripe")(STRIPE_SECRET);
 
 app.use(cors());
 app.use(express.json());
@@ -12,9 +14,24 @@ app.get('/', (req, res) => {
     res.send('hello');
 })
 
-
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.ljdbc6c.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+
+function verifyJWT(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        return res.status(401).send({ message: 'unauthorized access' })
+    }
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+        if (err) {
+            return res.status(401).send({ message: 'unauthorized access' })
+        }
+        req.decoded = decoded;
+        next();
+    })
+
+}
 
 async function run() {
     try {
@@ -24,6 +41,35 @@ async function run() {
         const brandCollection = client.db("sellphone").collection("brand");
         const wistlistCollection = client.db("sellphone").collection("wistlist");
 
+        // payment 1st
+        app.post("/create-payment-intent", async (req, res) => {
+            const order = req.body;
+            const price = oreder.price;
+            const amout = price * 100;
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: "usd",
+                payment_methods_types: [
+                    "card"
+                ],
+            });
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        })
+
+        // jwt
+        app.get('/jwt', async (req, res) => {
+            const email = req.query.email;
+            console.log(email);
+            const query = { email: email };
+            const user = await userCollection.findOne(query);
+            if (user) {
+                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+                return res.send({ accessToken: token });
+            }
+            res.status(403).send({ accessToken: '' })
+        });
 
         app.post('/wistlist', async (req, res) => {
             const wist = req.body;
@@ -31,12 +77,20 @@ async function run() {
             res.send(wistlist);
         })
 
-        // get all seller
-        app.get('/seller', async(req,res)=>{
-           const seller = await userCollection.find({}).toArray();
-           res.send(seller);
+        app.get('/wistlist/:id', async (req, res) => {
+            const query = {};
+            const service = wistlistCollection.find(query);
+            const newservice = await service.toArray();
+            const findServiceById = newservice.find(getService => getService._id == req.params.id)
+            res.send(findServiceById);
         })
-       
+
+        // get all seller
+        app.get('/seller', async (req, res) => {
+            const seller = await userCollection.find({}).toArray();
+            res.send(seller);
+        })
+
 
         // get buyer by email
         app.get('/wistlist', async (req, res) => {
@@ -52,7 +106,7 @@ async function run() {
         })
 
         // get buyer product for seller
-        app.get('/order/:seller_email', async (req, res) => {
+        app.get('/order/:seller_email', verifyJWT, async (req, res) => {
             const query = {};
             const service = wistlistCollection.find(query);
             const newphone = await service.toArray();
@@ -74,7 +128,17 @@ async function run() {
         })
 
         // get phones by user email
-        app.get('/getphones', async (req, res) => {
+        // jwt
+        app.get('/getphones', verifyJWT, async (req, res) => {
+            // const email = req.query.email;
+            // const decodedEmail = req.decoded.email;
+            // if (email !== decodedEmail) {
+            //     res.status(403).send({ message: 'forbidden access' })
+            // }
+            const decoded = req.decoded;
+            if (decoded.email !== req.query.email) {
+                res.status(403).send({ message: 'forbidden access' })
+            }
             let query = {};
             if (req.query.email) {
                 query = {
@@ -85,6 +149,7 @@ async function run() {
             const phones = await cursor.toArray();
             res.send(phones)
         })
+
 
         // get phones by brand
         app.get('/phones/:brand', async (req, res) => {
@@ -133,7 +198,7 @@ async function run() {
         })
 
         // make seller role
-        app.put('/user/seller/:id', async (req, res) => {
+        app.put('/user/seller/:id', verifyJWT, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: ObjectId(id) }
             const option = { upsert: true };
@@ -153,9 +218,28 @@ async function run() {
             const user = await userCollection.findOne(query);
             res.send({ IsSeller: user.role == 'isSeller' });
         })
-        
+
+
+        app.delete('/seller/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) };
+            const result = await userCollection.deleteOne(filter);
+            res.send(result);
+        })
+
+        const verifyAdmin = async (req, res, next) => {
+            const decodedEmail = req.decoded.email;
+            const query = { email: decodedEmail };
+            const user = await usersCollection.findOne(query);
+
+            if (user?.role !== 'isAdmin') {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            next();
+        }
+
         // make Admin role
-        app.put('/user/admin/:id', async (req, res) => {
+        app.put('/user/admin/:id', verifyJWT, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: ObjectId(id) }
             const option = { upsert: true };
