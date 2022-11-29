@@ -5,7 +5,7 @@ const port = 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
-const stripe = require("stripe")(STRIPE_SECRET);
+const stripe = require("stripe")(process.env.STRIPE_SECRET);
 
 app.use(cors());
 app.use(express.json());
@@ -40,23 +40,42 @@ async function run() {
         const phonesCollection = client.db("sellphone").collection("phones");
         const brandCollection = client.db("sellphone").collection("brand");
         const wistlistCollection = client.db("sellphone").collection("wistlist");
+        const paymentCollection = client.db("sellphone").collection("payment");
 
         // payment 1st
-        app.post("/create-payment-intent", async (req, res) => {
+        app.post('/create-payment-intent', async (req, res) => {
             const order = req.body;
-            const price = oreder.price;
-            const amout = price * 100;
+            const price = order.price;
+            const amount = price * 100;
+
             const paymentIntent = await stripe.paymentIntents.create({
+                currency: 'usd',
                 amount: amount,
-                currency: "usd",
-                payment_methods_types: [
+                "payment_method_types": [
                     "card"
-                ],
+                ]
             });
             res.send({
                 clientSecret: paymentIntent.client_secret,
             });
+        });
+
+        // send payment info to database
+        app.post('/payments', async (req, res) => {
+            const payment = req.body;
+            const result = await paymentCollection.insertOne(payment);
+            const id = payment.orderId
+            const filter = { _id: ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    paid: true,
+                    transactionId: payment.transactionId
+                }
+            }
+            const updatedResult = await wistlistCollection.updateOne(filter, updatedDoc)
+            res.send({result,updatedResult});
         })
+
 
         // jwt
         app.get('/jwt', async (req, res) => {
@@ -65,7 +84,7 @@ async function run() {
             const query = { email: email };
             const user = await userCollection.findOne(query);
             if (user) {
-                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '5d' })
                 return res.send({ accessToken: token });
             }
             res.status(403).send({ accessToken: '' })
