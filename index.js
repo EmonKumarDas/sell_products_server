@@ -163,6 +163,10 @@ async function run() {
             const phones = await cursor.toArray();
             res.send(phones)
         })
+        app.get('/adviretise', async (req, res) => {
+            const phoneCate = await phonesCollection.find({}).toArray();
+            res.send(phoneCate)
+        })
 
         app.delete('/getphones/:id', async (req, res) => {
             const id = req.params.id;
@@ -170,6 +174,20 @@ async function run() {
             const result = await phonesCollection.deleteOne(filter);
             res.send(result);
         })
+
+            // make is adviertis role
+            app.put('/getphones/:id', verifyJWT, async (req, res) => {
+                const id = req.params.id;
+                const filter = { _id: ObjectId(id) }
+                const option = { upsert: true };
+                const updateDoc = {
+                    $set: {
+                        role: 'isAdvertise',
+                    }
+                }
+                const result = await phonesCollection.updateOne(filter, updateDoc, option);
+                res.send({ result })
+            })
 
         // get phones by brand
         app.get('/phones/:brand', async (req, res) => {
