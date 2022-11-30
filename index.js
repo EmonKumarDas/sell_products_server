@@ -149,11 +149,6 @@ async function run() {
         // get phones by user email
         // jwt
         app.get('/getphones', verifyJWT, async (req, res) => {
-            // const email = req.query.email;
-            // const decodedEmail = req.decoded.email;
-            // if (email !== decodedEmail) {
-            //     res.status(403).send({ message: 'forbidden access' })
-            // }
             const decoded = req.decoded;
             if (decoded.email !== req.query.email) {
                 res.status(403).send({ message: 'forbidden access' })
@@ -169,6 +164,12 @@ async function run() {
             res.send(phones)
         })
 
+        app.delete('/getphones/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) };
+            const result = await phonesCollection.deleteOne(filter);
+            res.send(result);
+        })
 
         // get phones by brand
         app.get('/phones/:brand', async (req, res) => {
@@ -249,7 +250,7 @@ async function run() {
         const verifyAdmin = async (req, res, next) => {
             const decodedEmail = req.decoded.email;
             const query = { email: decodedEmail };
-            const user = await usersCollection.findOne(query);
+            const user = await userCollection.findOne(query);
 
             if (user?.role !== 'isAdmin') {
                 return res.status(403).send({ message: 'forbidden access' })
